@@ -1,6 +1,6 @@
-import React from "react";
+import React, {Placeholder} from "react";
 import { fetchMovieDetails, fetchMovieReviews } from "../api";
-import { createFetcher, Placeholder } from "../future";
+import { createFetcher } from "../future";
 import Icon from "./Icon";
 import Spinner from "./Spinner";
 import "./MoviePage.css";

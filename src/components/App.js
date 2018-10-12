@@ -1,5 +1,5 @@
-import React from "react";
-import { Component, Placeholder, createFetcher } from "../future";
+import React, {Placeholder} from "react";
+import {  createFetcher } from "../future";
 import Spinner from "./Spinner";
 import IndexPage from "./IndexPage";
 import "./App.css";
@@ -19,15 +19,11 @@ function MoviePageLoader(props) {
   return <MoviePage {...props} />;
 }
 
-export default class App extends Component {
+export default class App extends React.Component {
   state = {
     currentMovieId: null,
     showDetail: false
   };
-  // state = {
-  //   currentMovieId: 771401855,
-  //   showDetail: true
-  // };
 
   render() {
     const { showDetail, currentMovieId } = this.state;
@@ -55,11 +51,10 @@ export default class App extends Component {
   }
 
   handleMovieClick = movieId => {
-    this.setState({ currentMovieId: movieId });
-    this.deferSetState({ showDetail: true });
+    this.setState({ currentMovieId: movieId, showDetail: true });
   };
 
   handleBackClick = () => {
-    this.deferSetState({ currentMovieId: null, showDetail: false });
+    this.setState({ currentMovieId: null, showDetail: false });
   };
 }

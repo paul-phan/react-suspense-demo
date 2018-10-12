@@ -1,7 +1,7 @@
-/** @license React v16.3.0-alpha.1
+/** @license React v16.5.2
  * simple-cache-provider.development.js
  *
- * Copyright (c) 2013-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -18,7 +18,95 @@ if (process.env.NODE_ENV !== "production") {
 Object.defineProperty(exports, '__esModule', { value: true });
 
 var React = require('react');
-var warning = require('fbjs/lib/warning');
+
+/**
+ * Similar to invariant but only logs a warning if the condition is not met.
+ * This can be used to log issues in development environments in critical
+ * paths. Removing the logging code for production environments will keep the
+ * same logic and follow the same code paths.
+ */
+
+var warningWithoutStack = function () {};
+
+{
+  warningWithoutStack = function (condition, format) {
+    for (var _len = arguments.length, args = Array(_len > 2 ? _len - 2 : 0), _key = 2; _key < _len; _key++) {
+      args[_key - 2] = arguments[_key];
+    }
+
+    if (format === undefined) {
+      throw new Error('`warningWithoutStack(condition, format, ...args)` requires a warning ' + 'message argument');
+    }
+    if (args.length > 8) {
+      // Check before the condition to catch violations early.
+      throw new Error('warningWithoutStack() currently supports at most 8 arguments.');
+    }
+    if (condition) {
+      return;
+    }
+    if (typeof console !== 'undefined') {
+      var _args$map = args.map(function (item) {
+        return '' + item;
+      }),
+          a = _args$map[0],
+          b = _args$map[1],
+          c = _args$map[2],
+          d = _args$map[3],
+          e = _args$map[4],
+          f = _args$map[5],
+          g = _args$map[6],
+          h = _args$map[7];
+
+      var message = 'Warning: ' + format;
+
+      // We intentionally don't use spread (or .apply) because it breaks IE9:
+      // https://github.com/facebook/react/issues/13610
+      switch (args.length) {
+        case 0:
+          console.error(message);
+          break;
+        case 1:
+          console.error(message, a);
+          break;
+        case 2:
+          console.error(message, a, b);
+          break;
+        case 3:
+          console.error(message, a, b, c);
+          break;
+        case 4:
+          console.error(message, a, b, c, d);
+          break;
+        case 5:
+          console.error(message, a, b, c, d, e);
+          break;
+        case 6:
+          console.error(message, a, b, c, d, e, f);
+          break;
+        case 7:
+          console.error(message, a, b, c, d, e, f, g);
+          break;
+        case 8:
+          console.error(message, a, b, c, d, e, f, g, h);
+          break;
+        default:
+          throw new Error('warningWithoutStack() currently supports at most 8 arguments.');
+      }
+    }
+    try {
+      // --- Welcome to debugging React ---
+      // This error was thrown as a convenience so that you can use this stack
+      // to find the callsite that caused this warning to fire.
+      var argIndex = 0;
+      var _message = 'Warning: ' + format.replace(/%s/g, function () {
+        return args[argIndex++];
+      });
+      throw new Error(_message);
+    } catch (x) {}
+  };
+}
+
+var warningWithoutStack$1 = warningWithoutStack;
 
 function noop() {}
 
@@ -26,6 +114,7 @@ var Empty = 0;
 var Pending = 1;
 var Resolved = 2;
 var Rejected = 3;
+
 // TODO: How do you express this type with Flow?
 
 
@@ -41,33 +130,101 @@ var isCache = void 0;
   };
 }
 
-function createCache(invalidator) {
-  var resourceCache = new Map();
+// TODO: Make this configurable per resource
+var MAX_SIZE = 500;
+var PAGE_SIZE = 50;
 
-  function getRecord(resourceType, key) {
+function createRecord(key) {
+  return {
+    status: Empty,
+    suspender: null,
+    key: key,
+    value: null,
+    error: null,
+    next: null,
+    previous: null
+  };
+}
+
+function createRecordCache() {
+  return {
+    map: new Map(),
+    head: null,
+    tail: null,
+    size: 0
+  };
+}
+
+function createCache(invalidator) {
+  var resourceMap = new Map();
+
+  function accessRecord(resourceType, key) {
     {
-      warning(typeof resourceType !== 'string' && typeof resourceType !== 'number', 'Invalid resourceType: Expected a symbol, object, or function, but ' + 'instead received: %s. Strings and numbers are not permitted as ' + 'resource types.', resourceType);
+      !(typeof resourceType !== 'string' && typeof resourceType !== 'number') ? warningWithoutStack$1(false, 'Invalid resourceType: Expected a symbol, object, or function, but ' + 'instead received: %s. Strings and numbers are not permitted as ' + 'resource types.', resourceType) : void 0;
     }
 
-    var recordCache = resourceCache.get(resourceType);
-    if (recordCache !== undefined) {
-      var _record = recordCache.get(key);
-      if (_record !== undefined) {
-        return _record;
+    var recordCache = resourceMap.get(resourceType);
+    if (recordCache === undefined) {
+      recordCache = createRecordCache();
+      resourceMap.set(resourceType, recordCache);
+    }
+    var map = recordCache.map;
+
+    var record = map.get(key);
+    if (record === undefined) {
+      // This record does not already exist. Create a new one.
+      record = createRecord(key);
+      map.set(key, record);
+      if (recordCache.size >= MAX_SIZE) {
+        // The cache is already at maximum capacity. Remove PAGE_SIZE least
+        // recently used records.
+        // TODO: We assume the max capcity is greater than zero. Otherwise warn.
+        var _tail = recordCache.tail;
+        if (_tail !== null) {
+          var newTail = _tail;
+          for (var i = 0; i < PAGE_SIZE && newTail !== null; i++) {
+            recordCache.size -= 1;
+            map.delete(newTail.key);
+            newTail = newTail.previous;
+          }
+          recordCache.tail = newTail;
+          if (newTail !== null) {
+            newTail.next = null;
+          }
+        }
       }
     } else {
-      recordCache = new Map();
-      resourceCache.set(resourceType, recordCache);
+      // This record is already cached. Remove it from its current position in
+      // the list. We'll add it to the front below.
+      var _previous = record.previous;
+      var _next = record.next;
+      if (_previous !== null) {
+        _previous.next = _next;
+      } else {
+        recordCache.head = _next;
+      }
+      if (_next !== null) {
+        _next.previous = _previous;
+      } else {
+        recordCache.tail = _previous;
+      }
+      recordCache.size -= 1;
     }
 
-    var record = {
-      status: Empty,
-      suspender: null,
-      value: null,
-      error: null
-    };
-    recordCache.set(key, record);
-    return record;
+    // Add the record to the front of the list.
+    var head = recordCache.head;
+    var newHead = record;
+    recordCache.head = newHead;
+    newHead.previous = null;
+    newHead.next = head;
+    if (head !== null) {
+      head.previous = newHead;
+    } else {
+      recordCache.tail = newHead;
+    }
+    recordCache.size += 1;
+
+    return newHead;
   }
 
   function load(emptyRecord, suspender) {
@@ -94,7 +251,7 @@ function createCache(invalidator) {
       invalidator();
     },
     preload: function (resourceType, key, miss, missArg) {
-      var record = getRecord(resourceType, key);
+      var record = accessRecord(resourceType, key);
       switch (record.status) {
         case Empty:
           // Warm the cache.
@@ -113,7 +270,7 @@ function createCache(invalidator) {
       }
     },
     read: function (resourceType, key, miss, missArg) {
-      var record = getRecord(resourceType, key);
+      var record = accessRecord(resourceType, key);
       switch (record.status) {
         case Empty:
           // Load the requested resource.
@@ -143,7 +300,7 @@ function createCache(invalidator) {
 var warnIfNonPrimitiveKey = void 0;
 {
   warnIfNonPrimitiveKey = function (key, methodName) {
-    warning(typeof key === 'string' || typeof key === 'number' || typeof key === 'boolean' || key === undefined || key === null, '%s: Invalid key type. Expected a string, number, symbol, or boolean, ' + 'but instead received: %s' + '\n\nTo use non-primitive values as keys, you must pass a hash ' + 'function as the second argument to createResource().', methodName, key);
+    !(typeof key === 'string' || typeof key === 'number' || typeof key === 'boolean' || key === undefined || key === null) ? warningWithoutStack$1(false, '%s: Invalid key type. Expected a string, number, symbol, or boolean, ' + 'but instead received: %s' + '\n\nTo use non-primitive values as keys, you must pass a hash ' + 'function as the second argument to createResource().', methodName, key) : void 0;
   };
 }
 
@@ -162,7 +319,7 @@ function createResource(loadResource, hash) {
   var resource = {
     read: function (cache, key) {
       {
-        warning(isCache(cache), 'read(): The first argument must be a cache. Instead received: %s', cache);
+        !isCache(cache) ? warningWithoutStack$1(false, 'read(): The first argument must be a cache. Instead received: %s', cache) : void 0;
       }
       if (hash === undefined) {
         {
@@ -175,7 +332,7 @@ function createResource(loadResource, hash) {
     },
     preload: function (cache, key) {
       {
-        warning(isCache(cache), 'preload(): The first argument must be a cache. Instead received: %s', cache);
+        !isCache(cache) ? warningWithoutStack$1(false, 'preload(): The first argument must be a cache. Instead received: %s', cache) : void 0;
       }
       if (hash === undefined) {
         {
