@@ -48,6 +48,7 @@ function Movie({
 
 export default function IndexPage({ onMovieClick, loadingMovieId }) {
   const movies = MoviesFetcher.read(cache);
+  console.log('movies', movies)
   return (
     <div className="IndexPage">
       <h1>Top Box Office</h1>

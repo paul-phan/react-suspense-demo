@@ -1,12 +1,10 @@
-import React, {unstable_Suspense as Suspense} from 'react'
+import React, {lazy, unstable_Suspense as Suspense} from 'react'
 import {unstable_scheduleCallback} from 'scheduler'
-import {createResource} from 'react-cache'
-import {cache} from '../cache'
 import Spinner from './Spinner'
 import IndexPage from './IndexPage'
 import './App.css'
 
-const moviePageFetcher = createResource(() => import('./MoviePage'))
+const MoviePageLoader = lazy(() => import('./MoviePage'))
 
 function AppSpinner() {
 	return (
@@ -16,10 +14,6 @@ function AppSpinner() {
 	)
 }
 
-function MoviePageLoader(props) {
-	const MoviePage = moviePageFetcher.read(cache).default
-	return <MoviePage {...props} />
-}
 
 export default class App extends React.Component {
 	state = {
