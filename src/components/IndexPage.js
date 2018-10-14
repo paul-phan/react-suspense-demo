@@ -1,11 +1,12 @@
 import React from "react";
 import { fetchMovies } from "../api";
-import { createFetcher } from "../future";
+import {createResource} from 'react-cache';
+import {cache} from '../cache'
 import Icon from "./Icon";
 import Spinner from "./Spinner";
 import "./IndexPage.css";
 
-const MoviesFetcher = createFetcher(fetchMovies);
+const MoviesFetcher = createResource(fetchMovies);
 
 function Score({ score, icon }) {
   if (score === null || score < 0) return null;
@@ -46,7 +47,7 @@ function Movie({
 }
 
 export default function IndexPage({ onMovieClick, loadingMovieId }) {
-  const movies = MoviesFetcher.read();
+  const movies = MoviesFetcher.read(cache);
   return (
     <div className="IndexPage">
       <h1>Top Box Office</h1>

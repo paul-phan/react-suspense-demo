@@ -1,12 +1,14 @@
-import React, {Placeholder} from "react";
+import React, {unstable_Suspense as Suspense} from "react";
 import { fetchMovieDetails, fetchMovieReviews } from "../api";
-import { createFetcher } from "../future";
+
+import {createResource} from 'react-cache';
+import {cache} from '../cache'
 import Icon from "./Icon";
 import Spinner from "./Spinner";
 import "./MoviePage.css";
 
-const movieDetailsFetcher = createFetcher(fetchMovieDetails);
-const movieReviewsFetcher = createFetcher(fetchMovieReviews);
+const movieDetailsFetcher = createResource(fetchMovieDetails);
+const movieReviewsFetcher = createResource(fetchMovieReviews);
 
 function Rating({ label, score, icon }) {
   if (typeof score !== "number" || score < 0) return null;
@@ -33,7 +35,7 @@ function MovieReview({ quote, critic }) {
 }
 
 function MovieReviews({ movieId }) {
-  const reviews = movieReviewsFetcher.read(movieId);
+  const reviews = movieReviewsFetcher.read(cache, movieId);
   return (
     <div className="MovieReviews">
       {reviews.map(review => <MovieReview key={review.id} {...review} />)}
@@ -41,7 +43,7 @@ function MovieReviews({ movieId }) {
   );
 }
 
-const imageFetcher = createFetcher(
+const imageFetcher = createResource(
   src =>
     new Promise((resolve, reject) => {
       const image = new Image();
@@ -52,11 +54,11 @@ const imageFetcher = createFetcher(
 );
 
 function Img(props) {
-  return <img {...props} src={imageFetcher.read(props.src)} />;
+  return <img {...props} src={imageFetcher.read(cache,props.src)} />;
 }
 
 function MovieDetails({ movieId }) {
-  const { ratingSummary, ratings, title, posters } = movieDetailsFetcher.read(
+  const { ratingSummary, ratings, title, posters } = movieDetailsFetcher.read(cache,
     movieId
   );
 
@@ -92,9 +94,9 @@ export default function MoviePage({ movieId }) {
   return (
     <>
       <MovieDetails movieId={movieId} />
-      <Placeholder delayMs={500} fallback={<Spinner />}>
+      <Suspense maxDuration={500} fallback={<Spinner />}>
         <MovieReviews movieId={movieId} />
-      </Placeholder>
+      </Suspense>
     </>
   );
 }

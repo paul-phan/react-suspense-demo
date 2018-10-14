@@ -1,6 +1,6 @@
-import { default as React, unstable_AsyncMode as AsyncMode} from "react";
-import ReactDOM from "react-dom";
-import App from "./components/App";
-import "./index.css";
+import {default as React} from 'react'
+import {unstable_createRoot} from 'react-dom'
+import App from './components/App'
+import './index.css'
 
-ReactDOM.render(<AsyncMode><App /></AsyncMode>, document.querySelector("#main"));
+unstable_createRoot(document.getElementById('main')).render(<App/>)
